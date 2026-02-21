@@ -219,3 +219,34 @@ try {
 } catch {
     # Si falla, simplemente no activa la predicción pero NO muestra error
 }
+
+# --- 10. FUNCIÓN DE AUTO-SUBIDA A GITHUB ---
+function subir {
+    # 1. Definimos la carpeta de trabajo
+    $repoPath = "$HOME\Documents\MiTerminal"
+    
+    Write-Host "--- Iniciando actualización en GitHub para MANUEL ---" -ForegroundColor Cyan
+    
+    # 2. Copiamos el perfil actual a la carpeta del repo por si hubo cambios
+    Write-Host "> Copiando perfil actualizado..." -ForegroundColor Gray
+    copy $PROFILE "$repoPath\Microsoft.PowerShell_profile.ps1" -Force
+    
+    # 3. Entramos a la carpeta
+    cd $repoPath
+    
+    # 4. Ejecutamos la secuencia de Git
+    Write-Host "> Preparando archivos..." -ForegroundColor Gray
+    git add .
+    
+    Write-Host "> Creando commit..." -ForegroundColor Gray
+    $fecha = Get-Date -Format "yyyy-MM-dd HH:mm"
+    git commit -m "Actualización automática: $fecha"
+    
+    Write-Host "> Subiendo a la nube (Push)..." -ForegroundColor Yellow
+    git push origin main
+    
+    Write-Host "--- ¡Todo listo, charlish73-ops! Tu GitHub está al día ---" -ForegroundColor Green
+    
+    # 5. Volvemos al inicio
+    cd ~
+}
