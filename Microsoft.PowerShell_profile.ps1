@@ -220,33 +220,131 @@ try {
     # Si falla, simplemente no activa la predicción pero NO muestra error
 }
 
-# --- 10. FUNCIÓN DE AUTO-SUBIDA A GITHUB ---
+# --- 10. FUNCION DE AUTO-SUBIDA A GITHUB ---
 function subir {
-    # 1. Definimos la carpeta de trabajo
     $repoPath = "$HOME\Documents\MiTerminal"
-    
-    Write-Host "--- Iniciando actualización en GitHub para MANUEL ---" -ForegroundColor Cyan
-    
-    # 2. Copiamos el perfil actual a la carpeta del repo por si hubo cambios
-    Write-Host "> Copiando perfil actualizado..." -ForegroundColor Gray
+    Write-Host "--- Actualizando GitHub para MANUEL ---" -ForegroundColor Cyan
     copy $PROFILE "$repoPath\Microsoft.PowerShell_profile.ps1" -Force
-    
-    # 3. Entramos a la carpeta
     cd $repoPath
-    
-    # 4. Ejecutamos la secuencia de Git
-    Write-Host "> Preparando archivos..." -ForegroundColor Gray
     git add .
-    
-    Write-Host "> Creando commit..." -ForegroundColor Gray
     $fecha = Get-Date -Format "yyyy-MM-dd HH:mm"
-    git commit -m "Actualización automática: $fecha"
-    
-    Write-Host "> Subiendo a la nube (Push)..." -ForegroundColor Yellow
+    git commit -m "Auto-update: $fecha"
     git push origin main
-    
-    Write-Host "--- ¡Todo listo, charlish73-ops! Tu GitHub está al día ---" -ForegroundColor Green
-    
-    # 5. Volvemos al inicio
+    Write-Host "--- GitHub actualizado correctamente ---" -ForegroundColor Green
     cd ~
+}
+
+# --- 11. DESCARGADOR DE VIDEOS (MASIVO Y PLAYLISTS) ---
+function descargar {
+    param(
+        [string[]]$urls
+    )
+    
+    if (-not $urls) { 
+        $input = Read-Host "Pega los links (separados por espacio) o el link de una Playlist"
+        $urls = $input -split " "
+    }
+
+    $folder = "C:\Users\porgr\PLATON"
+    if (-not (Test-Path $folder)) { New-Item -ItemType Directory -Path $folder }
+
+    $destino = "$folder\%(title)s.%(ext)s"
+
+    Write-Host "`n=== MODO DESCARGA MASIVA PARA MANUEL ===" -ForegroundColor Cyan
+
+    foreach ($url in $urls) {
+        if ($url.Trim()) {
+            Write-Host "`n> Procesando: $url" -ForegroundColor Yellow
+            
+            # Comando yt-dlp optimizado para Playlists
+            yt-dlp -f "bestvideo+bestaudio/best" `
+                   --merge-output-format mp4 `
+                   --yes-playlist `
+                   --concurrent-fragments 5 `
+                   -o "$destino" $url.Trim()
+        }
+    }
+
+    Write-Host "`n=== DESCARGAS COMPLETADAS EN PLATON ===" -ForegroundColor Green
+}
+
+# El alias para usarlo rápido
+Set-Alias -Name yt -Value descargar
+
+# --- 12. GESTOR DE VIDEOS (CORREGIDO) ---
+function video {
+    $folder = "C:\Users\porgr\PLATON"
+    
+    # 1. Validar carpeta
+    if (-not (Test-Path $folder)) {
+        Write-Host "No encuentro la carpeta PLATON en $folder" -ForegroundColor Red
+        return
+    }
+
+    # 2. Forzar lista de archivos MP4 (sin filtros raros)
+    $videos = Get-ChildItem -Path $folder -Filter *.mp4 -File
+
+    if ($videos.Count -eq 0) {
+        Write-Host "PowerShell no detecta los .mp4. Revisa las extensiones." -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "`n=== VIDEOS ENCONTRADOS: $($videos.Count) ===" -ForegroundColor Cyan
+
+    # 3. Ventana de selección múltiple
+    # He simplificado las columnas para que no den error con nombres largos
+    $seleccion = $videos | Select-Object Name | 
+                 Out-GridView -Title "Selecciona tus videos para MPV - MANUEL" -OutputMode Multiple
+
+    if ($seleccion) {
+        # Construir rutas exactas
+        $rutas = $seleccion | ForEach-Object { Join-Path $folder $_.Name }
+        
+        Write-Host "Lanzando MPV con tu selección..." -ForegroundColor Green
+        # Ejecutar MPV
+        mpv $rutas --autofit=70% --ontop
+    }
+}
+
+# --- 13. REPRODUCTOR DE MUSICA (VERSION PARA MILES DE CANCIONES) ---
+function musica {
+    $musicFolder = "D:\MUSICA"
+    $playlistPath = "$env:TEMP\playlist_manuel.m3u"
+    
+    if (-not (Test-Path $musicFolder)) {
+        Write-Host "No se encuentra la carpeta en $musicFolder." -ForegroundColor Red
+        return
+    }
+
+    Write-Host "Escaneando biblioteca de Manuel... (esto puede tardar unos segundos)" -ForegroundColor Gray
+    $listaMusica = Get-ChildItem -Path $musicFolder -Include *.mp3, *.flac, *.wav, *.m4a -File -Recurse
+
+    if ($listaMusica.Count -eq 0) {
+        Write-Host "No hay música en $musicFolder." -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "`n=== DISCOTECA DE MANUEL ($($listaMusica.Count) temas) ===" -ForegroundColor Cyan
+    
+    # Ventana de selección
+    $seleccion = $listaMusica | Select-Object Name, @{Name="Carpeta"; Expression={$_.Directory.Name}} | 
+                 Out-GridView -Title "Selecciona tu Música - MANUEL" -OutputMode Multiple
+
+    if ($seleccion) {
+        Write-Host "Preparando lista de reproducción..." -ForegroundColor Gray
+        
+        # Obtenemos las rutas completas
+        $rutas = $seleccion | ForEach-Object { 
+            $name = $_.Name
+            ($listaMusica | Where-Object { $_.Name -eq $name }).FullName 
+        }
+
+        # CREAMOS EL ARCHIVO DE LISTA (Para evitar el error de 'nombre demasiado largo')
+        $rutas | Out-File -FilePath $playlistPath -Encoding utf8
+
+        Write-Host "Reproduciendo $($seleccion.Count) canciones en MPV..." -ForegroundColor Green
+        
+        # Ejecutamos MPV cargando la lista de reproducción
+        mpv --playlist=$playlistPath --no-video --shuffle
+    }
 }
